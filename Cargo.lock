@@ -573,7 +573,7 @@ dependencies = [
 ]
 
 [[package]]
-name = "mtg_proxy_boosterpack_gen"
+name = "mtg-proxy-boosterpack-gen"
 version = "0.1.0"
 dependencies = [
  "dirs",

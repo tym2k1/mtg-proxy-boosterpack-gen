@@ -1,4 +1,4 @@
-# mtg_proxy_boosterpack_gen
+# mtg-proxy-boosterpack-gen
 
 This project exists for easy generation of **Magic: The Gathering** booster packs
 proxies for casual play or draft sessions.
@@ -14,7 +14,7 @@ It uses [Reuben's algorhitm](https://gist.github.com/fenhl/8d163733ab92ed718d899
 
 > Wizards of the Coast, Magic: The Gathering, and their logos are trademarks of
 Wizards of the Coast LLC in the United States and other countries. © 1993-2026
-Wizards. All Rights Reserved. mtg_proxy_boosterpack_gen may use the trademarks
+Wizards. All Rights Reserved. mtg-proxy-boosterpack-gen may use the trademarks
 and other intellectual property of Wizards of the Coast LLC, which is permitted
 under Wizards' Fan Site Policy. For more information about Wizards of the Coast
 or any of Wizards' trademarks or other intellectual property, please visit
