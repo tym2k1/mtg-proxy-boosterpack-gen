@@ -41,7 +41,7 @@ async fn main() {
 
     println!("Generating booster pack...\n");
 
-    let pack = generate_pack(&pool);
+    let pack = generate_valid_pack(&pool);
 
     println!("=== Booster Pack ===");
 
