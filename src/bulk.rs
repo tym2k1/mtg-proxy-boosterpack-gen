@@ -1,10 +1,25 @@
 use reqwest::{Client, header};
+use serde::{Deserialize, Serialize};
+use serde::de::DeserializeOwned;
 use serde_json::Value;
 use tokio::time::{sleep, Duration};
-use crate::config::{API_DELAY_MS, USER_AGENT, ACCEPT};
-use crate::model::Card;
+use std::fs;
 
-/// Build a reqwest client with Scryfall-required headers
+const CACHE_FILE: &str = "scryfall.cache";
+const API_DELAY_MS: u64 = 75;
+
+// Scryfall requires a User-Agent string
+const USER_AGENT: &str = "tym2k1/mtg-proxy-boosterpack-gen (tymbur@gmail.com)";
+const ACCEPT: &str = "application/json";
+
+use crate::model::{Card, SetInfo};
+
+#[derive(Default, Serialize, Deserialize)]
+struct ApiCache {
+    cards: Option<Vec<Card>>,
+    sets: Option<Vec<SetInfo>>,
+}
+
 fn build_client() -> Client {
     let mut headers = header::HeaderMap::new();
     headers.insert(header::USER_AGENT, USER_AGENT.parse().unwrap());
@@ -16,102 +31,116 @@ fn build_client() -> Client {
         .unwrap()
 }
 
-/// Fetch the URI of the Scryfall default_cards bulk dataset
-pub async fn get_bulk_uri() -> Result<String, Box<dyn std::error::Error>> {
+fn load_cache() -> ApiCache {
+    fs::read_to_string(CACHE_FILE)
+        .ok()
+        .and_then(|s| serde_json::from_str(&s).ok())
+        .unwrap_or_default()
+}
+
+fn save_cache(cache: &ApiCache) {
+    let json = serde_json::to_string(cache).unwrap();
+    fs::write(CACHE_FILE, json).unwrap();
+}
+
+async fn fetch_json<T: DeserializeOwned>(
+    client: &Client,
+    url: &str,
+    delay: bool,
+) -> Result<Vec<T>, Box<dyn std::error::Error>> {
+
+    if delay {
+        sleep(Duration::from_millis(API_DELAY_MS)).await;
+    }
+
+    let resp = client.get(url).send().await?;
+
+    if !resp.status().is_success() {
+        let status = resp.status();
+        let text = resp.text().await.unwrap_or_default();
+        return Err(format!("HTTP {}: {}", status, text).into());
+    }
+
+    let text = resp.text().await?;
+
+    // Try parsing direct array first
+    if let Ok(v) = serde_json::from_str::<Vec<T>>(&text) {
+        return Ok(v);
+    }
+
+    // Otherwise parse `{ data: [...] }`
+    let value: Value = serde_json::from_str(&text)?;
+
+    let data = value.get("data")
+        .ok_or("Missing data field")?;
+
+    let parsed: Vec<T> = serde_json::from_value(data.clone())?;
+
+    Ok(parsed)
+}
+
+pub async fn fetch_cards() -> Result<Vec<Card>, Box<dyn std::error::Error>> {
+
+    let mut cache = load_cache();
+
+    if let Some(cards) = cache.cards {
+        eprintln!("Loaded cards from cache");
+        return Ok(cards);
+    }
+
     eprintln!("Fetching Scryfall bulk metadata...");
 
     let client = build_client();
-    let resp = client.get("https://api.scryfall.com/bulk-data").send().await;
 
-    let resp = match resp {
-        Ok(r) => r,
-        Err(e) => {
-            eprintln!("HTTP request to /bulk-data failed: {}", e);
-            return Err(Box::new(e));
-        }
-    };
+    let bulk: Value = client
+        .get("https://api.scryfall.com/bulk-data")
+        .send()
+        .await?
+        .json()
+        .await?;
 
-    if !resp.status().is_success() {
-        let status = resp.status();
-        let text = resp.text().await.unwrap_or_default();
-        eprintln!("Scryfall API returned HTTP {}: {}", status, text);
-        return Err(format!("HTTP error {}", status).into());
-    }
+    let uri = bulk["data"]
+        .as_array()
+        .unwrap()
+        .iter()
+        .find(|x| x["type"] == "default_cards")
+        .unwrap()["download_uri"]
+        .as_str()
+        .unwrap()
+        .to_string();
 
-    let json: Value = match resp.json().await {
-        Ok(j) => j,
-        Err(e) => {
-            eprintln!("Failed to parse JSON from /bulk-data: {}", e);
-            return Err(Box::new(e));
-        }
-    };
-
-    let data = match json.get("data").and_then(|v| v.as_array()) {
-        Some(d) => d,
-        None => {
-            eprintln!("Missing 'data' field in bulk-data response: {}", json);
-            return Err("Missing 'data' field".into());
-        }
-    };
-
-    for entry in data {
-        if entry.get("type").and_then(|t| t.as_str()) == Some("default_cards") {
-            if let Some(uri) = entry.get("download_uri").and_then(|v| v.as_str()) {
-                eprintln!("Found default_cards bulk dataset: {}", uri);
-                return Ok(uri.to_string());
-            } else {
-                eprintln!("default_cards entry missing 'download_uri': {}", entry);
-                return Err("Missing 'download_uri'".into());
-            }
-        }
-    }
-
-    eprintln!("default_cards dataset not found in response: {}", json);
-    Err("default_cards dataset not found".into())
-}
-
-/// Download the bulk dataset and return as Vec<Card>
-/// Handles errors gracefully and prints them to stderr
-pub async fn download_dataset() -> Result<Vec<Card>, Box<dyn std::error::Error>> {
     eprintln!("Downloading Scryfall dataset...");
 
-    let uri = match get_bulk_uri().await {
-        Ok(u) => u,
-        Err(e) => {
-            eprintln!("Could not fetch bulk URI: {}", e);
-            return Err(e);
-        }
-    };
+    let cards: Vec<Card> = fetch_json(&client, &uri, true).await?;
 
-    // Respect the 75 ms delay before fetching the large dataset
-    sleep(Duration::from_millis(API_DELAY_MS)).await;
+    eprintln!("Downloaded {} cards", cards.len());
 
-    let client = build_client();
-    let resp = client.get(&uri).send().await;
+    cache.cards = Some(cards.clone());
+    save_cache(&cache);
 
-    let resp = match resp {
-        Ok(r) => r,
-        Err(e) => {
-            eprintln!("HTTP request to bulk dataset failed: {}", e);
-            return Err(Box::new(e));
-        }
-    };
+    Ok(cards)
+}
 
-    if !resp.status().is_success() {
-        let status = resp.status();
-        let text = resp.text().await.unwrap_or_default();
-        eprintln!("Bulk dataset API returned HTTP {}: {}", status, text);
-        return Err(format!("HTTP error {}", status).into());
+pub async fn fetch_sets() -> Result<Vec<SetInfo>, Box<dyn std::error::Error>> {
+
+    let mut cache = load_cache();
+
+    if let Some(sets) = cache.sets {
+        eprintln!("Loaded sets from cache");
+        return Ok(sets);
     }
 
-    let cards: Vec<Card> = match resp.json().await {
-        Ok(c) => c,
-        Err(e) => {
-            eprintln!("Failed to parse JSON from bulk dataset: {}", e);
-            return Err(Box::new(e));
-        }
-    };
+    eprintln!("Fetching MTG set list...");
 
-    eprintln!("Successfully downloaded {} cards", cards.len());
-    Ok(cards)
+    let client = build_client();
+
+    let sets: Vec<SetInfo> =
+        fetch_json(&client, "https://api.scryfall.com/sets", false).await?;
+
+    eprintln!("Found {} MTG sets", sets.len());
+
+    cache.sets = Some(sets.clone());
+    save_cache(&cache);
+
+    Ok(sets)
 }

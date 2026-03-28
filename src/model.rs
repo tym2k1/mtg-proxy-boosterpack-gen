@@ -14,3 +14,9 @@ pub struct Card {
 pub struct ImageUris {
     pub normal: String,
 }
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct SetInfo {
+    pub code: String,
+    pub name: String,
+}
