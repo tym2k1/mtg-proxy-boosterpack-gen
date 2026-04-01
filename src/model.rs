@@ -10,6 +10,17 @@ pub struct Card {
     pub image_uris: Option<ImageUris>,
 }
 
+impl Card {
+    pub fn image_url(&self, preferred: &str) -> Option<&str> {
+        let uris = self.image_uris.as_ref()?;
+        match preferred {
+            "normal" => Some(&uris.normal),
+            _ => Some(&uris.normal),
+        }
+    }
+}
+
+
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct ImageUris {
     pub normal: String,

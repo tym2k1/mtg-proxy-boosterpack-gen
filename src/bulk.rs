@@ -6,7 +6,7 @@ use tokio::time::{sleep, Duration};
 use std::fs;
 
 const CACHE_FILE: &str = "scryfall.cache";
-const API_DELAY_MS: u64 = 75;
+pub const API_DELAY_MS: u64 = 75;
 
 // Scryfall requires a User-Agent string
 const USER_AGENT: &str = "tym2k1/mtg-proxy-boosterpack-gen (tymbur@gmail.com)";

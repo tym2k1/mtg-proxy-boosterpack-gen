@@ -2,11 +2,13 @@ mod model;
 mod bulk;
 mod pool;
 mod booster;
+mod pdf;
 
 use bulk::*;
 use pool::*;
 use booster::*;
 use model::*;
+use pdf::*;
 
 use std::env;
 
@@ -71,6 +73,8 @@ async fn main() {
         }
     };
 
+    let mut all_cards: Vec<Card> = Vec::new();
+
     // Generate packs
     println!("Generating {} booster packs...\n", pack_count);
 
@@ -80,10 +84,17 @@ async fn main() {
 
         println!("=== Booster Pack {} ===", i);
 
-        for card in pack {
+        for card in &pack {
             println!("1x {}", card.name);
         }
 
         println!();
+        all_cards.extend(pack);
+
     }
+        println!("Generating printable PDF...");
+
+        generate_pdf(&all_cards, "boosters.pdf");
+
+        println!("Saved boosters.pdf");
 }
