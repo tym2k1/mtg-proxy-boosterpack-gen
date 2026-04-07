@@ -30,4 +30,5 @@ pub struct ImageUris {
 pub struct SetInfo {
     pub code: String,
     pub name: String,
+    pub set_type: String,
 }

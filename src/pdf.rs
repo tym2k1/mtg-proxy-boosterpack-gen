@@ -11,10 +11,11 @@ const CARD_H_MM:      f32 = 88.0;
 const CARD_GAP_MM:    f32 = 3.0;
 const PAGE_MARGIN_MM: f32 = 7.5;  // Left/top margin (I didnt care enough to center)
 
-pub fn generate_pdf(cards: &[Card], filename: &str) {
+pub async fn generate_pdf(cards: &[Card], filename: &str) {
     let mut doc = PdfDocument::new("MTG Proxies");
     let mut pages_ops: Vec<Vec<Op>> = Vec::new();
 
+    
     // Build a single client once, outside the loop
     let client = Client::builder()
         .timeout(Duration::from_secs(10))
