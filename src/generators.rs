@@ -4,26 +4,12 @@ use crate::booster::*;
 use crate::model::*;
 use crate::pdf::*;
 
-use std::env;
-
-
-/// Find a set by code
-pub fn find_set<'a>(sets: &'a [SetInfo], code: &str) -> Option<&'a SetInfo> {
-    sets.iter().find(|s| s.code == code)
+pub fn find_set_name<'a>(sets: &'a [SetInfo], name: &str) -> Option<&'a SetInfo> {
+    sets.iter().find(|s| s.name == name)
 }
 
 
-pub async fn generate_boosters() {
-    let args: Vec<String> = env::args().collect();
-
-    if args.len() < 3 {
-        eprintln!("Usage: {} <set_code> <num_packs>", args[0]);
-        eprintln!("Example: {} blb 6", args[0]);
-        return;
-    }
-
-    let set_code = &args[1];
-    let pack_count: usize = args[2].parse().unwrap_or(1);
+pub async fn generate_boosters(set_name: &str, pack_count: i32) {
 
     // Fetch datasets
     let cards = match fetch_cards().await {
@@ -34,7 +20,7 @@ pub async fn generate_boosters() {
         }
     };
 
-    let sets = match fetch_sets().await {
+    let sets = match fetch_sets(false).await {
         Ok(s) => s,
         Err(e) => {
             eprintln!("Could not fetch set list: {}", e);
@@ -43,10 +29,10 @@ pub async fn generate_boosters() {
     };
 
     // Resolve requested set
-    let set = match find_set(&sets, set_code) {
+    let set = match find_set_name(&sets, set_name) {
         Some(s) => s,
         None => {
-            eprintln!("Unknown set code: {}", set_code);
+            eprintln!("Unknown set name: {}", set_name);
             return;
         }
     };
@@ -87,7 +73,7 @@ pub async fn generate_boosters() {
     }
         println!("Generating printable PDF...");
 
-        generate_pdf(&all_cards, "boosters.pdf");
+        generate_pdf(&all_cards, "boosters.pdf").await;
 
         println!("Saved boosters.pdf");
 }

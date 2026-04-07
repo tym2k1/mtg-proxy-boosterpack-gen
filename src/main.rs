@@ -6,11 +6,15 @@ mod pdf;
 mod generators;
 mod gui;
 
-use generators::*;
+use crate::bulk::{fetch_sets};
+
+use crate::gui::gui::gui_build;
 
 
 #[tokio::main]
 async fn main() {
-    gui();
+    print!("hello world");
+    fetch_sets(false).await;
+    gui_build();
     //generate_boosters().await;
 }

@@ -15,9 +15,9 @@ const ACCEPT: &str = "application/json";
 use crate::model::{Card, SetInfo};
 
 #[derive(Default, Serialize, Deserialize)]
-struct ApiCache {
-    cards: Option<Vec<Card>>,
-    sets: Option<Vec<SetInfo>>,
+pub struct ApiCache {
+    pub cards: Option<Vec<Card>>,
+    pub sets: Option<Vec<SetInfo>>,
 }
 
 fn build_client() -> Client {
@@ -31,7 +31,7 @@ fn build_client() -> Client {
         .unwrap()
 }
 
-fn load_cache() -> ApiCache {
+pub fn load_cache() -> ApiCache {
     fs::read_to_string(CACHE_FILE)
         .ok()
         .and_then(|s| serde_json::from_str(&s).ok())
@@ -83,10 +83,13 @@ pub async fn fetch_cards() -> Result<Vec<Card>, Box<dyn std::error::Error>> {
 
     let mut cache = load_cache();
 
+
+
     if let Some(cards) = cache.cards {
         eprintln!("Loaded cards from cache");
         return Ok(cards);
     }
+
 
     eprintln!("Fetching Scryfall bulk metadata...");
 
@@ -121,13 +124,15 @@ pub async fn fetch_cards() -> Result<Vec<Card>, Box<dyn std::error::Error>> {
     Ok(cards)
 }
 
-pub async fn fetch_sets() -> Result<Vec<SetInfo>, Box<dyn std::error::Error>> {
+pub async fn fetch_sets(overwrite: bool) -> Result<Vec<SetInfo>, Box<dyn std::error::Error>> {
 
     let mut cache = load_cache();
 
-    if let Some(sets) = cache.sets {
-        eprintln!("Loaded sets from cache");
-        return Ok(sets);
+    if !overwrite { //check if we want to find new sets
+        if let Some(sets) = cache.sets {
+            eprintln!("Loaded sets from cache");
+            return Ok(sets);
+        }
     }
 
     eprintln!("Fetching MTG set list...");
